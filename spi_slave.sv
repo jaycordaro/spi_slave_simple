@@ -20,7 +20,10 @@
     OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
-
+/* Description: Simple SPI Slave for CPOL==0/CPHA==0 
+   MSB is a Read/Write bit (1== Read, 0== Write) followed by a addrsz (default 7-bit) address field, and by a (default 8-bit) payload field.
+   
+*/
 module spi_slave
 		#(
 			parameter int pktsz = 16,  //  size of SPI packet
