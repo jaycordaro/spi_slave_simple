@@ -22,7 +22,8 @@
 */
 /* Description: Simple SPI Slave for CPOL==0/CPHA==0 
    MSB is a Read/Write bit (1== Read, 0== Write) followed by a addrsz (default 7-bit) address field, and by a (default 8-bit) payload field.
-   
+   if RW bit is set, the interface will return a read of the register on MISO addressed by the address field.  If RW bit is not set, it will write 
+   the contents of the payload field to the register addressed by the address field.
 */
 module spi_slave
 		#(
@@ -39,11 +40,11 @@ module spi_slave
 		 input logic MOSI,
 		 output logic MISO,
 		// 
-		 input  logic [payload-1:0] tx_d, // data to transmit to the master
+		 input  logic [payload-1:0] tx_d, // data to transmit to the master on MISO
 		 output logic txdv,				
-		 output logic [addrsz-1:0] addr,
+		 output logic [addrsz-1:0] addr,  // address to slave from master on MOSI
 		 output logic addr_dv,
-		 output logic [payload-1:0] rx_d, // data rx from master
+		 output logic [payload-1:0] rx_d, // data rx from master on MOSI
 		 output logic rxdv,             // rx data valid
 		 output logic rxer				// rx error 
 );            
@@ -140,20 +141,20 @@ always_comb begin : next_state_logic
 						else if (spi_end)
 							next_state = IDLE;
 
-		RD_STATE	:	if (spi_active && sync_sclk_re && !rxdv)
+		WR_STATE	:	if (spi_active && sync_sclk_re && !rxdv)  // write TO slave on MOSI
 							begin
 								rx_d = {rx_d[6:0], d_i};
 								bitcnt = bitcnt + 1;
-								next_state = RD_STATE;
+								next_state = WR_STATE;
 							end
 						else if (spi_end)
 							next_state = IDLE;
 
-		WR_STATE	:	if (spi_active && sync_sclk_re && !txdv)
+		RD_STATE	:	if (spi_active && sync_sclk_re && !txdv)  // read FROM slave, return on MISO
 							begin
 								d_o   = tx_d[bitcnt-addrsz];
 								bitcnt = bitcnt + 1;
-								next_state = WR_STATE;
+								next_state = RD_STATE;
 							end
 						else if (spi_end)
 								next_state = IDLE;
