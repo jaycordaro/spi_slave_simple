@@ -105,7 +105,6 @@ always_comb begin : next_state_logic
 	unique case (state)
 		IDLE 		: 	begin
 							bitcnt = 4'b0000;
-							rw_sel = 0;
 							addr =  7'b000_0000;
 							rx_d = 8'b0000_0000;
 							rxer = 0;
