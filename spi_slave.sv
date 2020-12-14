@@ -45,8 +45,8 @@ module spi_slave
 		 output logic [addrsz-1:0] addr,  // address to slave from master on MOSI
 		 output logic addr_dv,
 		 output logic [payload-1:0] rx_d, // data rx from master on MOSI
-		 output logic rxdv,             // rx data valid
-		 output logic rxer				// rx error 
+		 output logic rxdv             // rx data valid
+		 //output logic rxer				// rx error 
 );            
 
 logic [2:0] sync_sclk;
@@ -77,7 +77,7 @@ logic spi_start;
 logic spi_end; 
 logic spi_active;
 logic d_i;
-logic d_o;
+logic [7:0] d_o;
 
 assign sync_sclk_fe = (sync_sclk[2:1]==2'b10) ? 1'b1 : 1'b0;  // falling edge
 assign sync_sclk_re = (sync_sclk[2:1]==2'b01) ? 1'b1 : 1'b0;  // rising edge
@@ -86,85 +86,64 @@ assign spi_start = (sync_ss[2:1]==2'b10) ? 1'b1 : 1'b0;         // ss -- active 
 assign spi_end   =   (sync_ss[2:1]==2'b01) ? 1'b1 : 1'b0;       // transaction ends 
 assign spi_active = ~sync_ss[1];
   
-
 assign d_i = sync_mosi[1];
 
-enum {IDLE, ADDR_STATE, RD_STATE, WR_STATE} state, next_state;
+always_ff @(posedge clk, negedge reset_n)
+begin
+	if (~reset_n || spi_start)
+		bitcnt <= 0;
+	else if (spi_active && sync_sclk_re)
+		bitcnt <= bitcnt + 1;
+end
 
-always_ff @(posedge clk, negedge reset_n) begin : spi_state_mach
-	if (~reset_n) 
-	begin
-		state<=IDLE;
-	end
-	else 
-		state <= next_state;
-end : spi_state_mach
+//assign rw = (bitcnt == 0 && spi_active && sync_sclk_re && d_i == 1) ? 1'b1 : 1'b0;
 
-always_comb begin : next_state_logic
-	next_state = state;
-	unique case (state)
-		IDLE 		: 	begin
-							bitcnt = 4'b0000;
-							addr =  7'b000_0000;
-							rx_d = 8'b0000_0000;
-							rxer = 0;
-							d_o = 0;			
-							if (spi_active && sync_sclk_re)
-									if (d_i)
-										begin
-										rw=1;
-										next_state = ADDR_STATE;
-										end
-									else
-										begin
-										rw=0;
-										next_state = ADDR_STATE;
-										end
-							else 
-								begin
-									next_state = IDLE;
-									rw = 0;
-								end
-						end
-							
-		ADDR_STATE 	:	if (spi_active && sync_sclk_re && !addr_dv)
-							begin
-								addr = {addr[5:0], d_i };
-								bitcnt = bitcnt + 1;
-								next_state = ADDR_STATE;
-							end
-						else if (spi_active && addr_dv && rw)
-							next_state = RD_STATE;
-						else if (spi_active && addr_dv && !rw)
-							next_state = WR_STATE;
-						else if (spi_end)
-							next_state = IDLE;
+always_ff @(posedge clk, negedge reset_n)
+begin
+	if (~reset_n || spi_start || spi_end)
+		rw <= 0;
+	else if (spi_active && sync_sclk_re && bitcnt == 1'b0)
+		rw <= d_i;
+end
 
-		WR_STATE	:	if (spi_active && sync_sclk_re && !rxdv)  // write TO slave on MOSI
-							begin
-								rx_d = {rx_d[6:0], d_i};
-								bitcnt = bitcnt + 1;
-								next_state = WR_STATE;
-							end
-						else if (spi_end)
-							next_state = IDLE;
+always_ff @(posedge clk, negedge reset_n)
+begin
+	if (~reset_n || spi_start)
+		addr <= 0;
+	else if (spi_active && sync_sclk_re && bitcnt > 0 && bitcnt <= 7)
+		addr <= {addr[5:0], d_i };
+end
 
-		RD_STATE	:	if (spi_active && sync_sclk_re && !txdv)  // read FROM slave, return on MISO
-							begin
-								d_o   = tx_d[bitcnt-addrsz];
-								bitcnt = bitcnt + 1;
-								next_state = RD_STATE;
-							end
-						else if (spi_end)
-								next_state = IDLE;
-	endcase
-end : next_state_logic
+always_ff @(posedge clk, negedge reset_n)
+begin
+	if (~reset_n || spi_start)
+		d_o <= tx_d;
+	else if (spi_active && sync_sclk_re && bitcnt > header - 1 && rw)
+		begin
+			d_o <= {d_o[6:0], 1'b0};
+		end
+end
 
-assign MISO = d_o;
+always_ff @(posedge clk, negedge reset_n)
+begin
+	if (~reset_n || spi_start)
+		rx_d <= 0;
+	else if (spi_active && sync_sclk_re && bitcnt > header - 1 && ~rw)
+		rx_d = {rx_d[6:0], d_i};
+end
 
-assign addr_dv = (bitcnt >= header - 1 ) ? 1'b1 : 1'b0;
+assign MISO = (bitcnt > header - 1  && rw) ? d_o[7] : 1'b0;
 
-assign rxdv = (bitcnt == pktsz - 1 && rw == 1) ? 1'b1 : 1'b0;
-assign txdv = (bitcnt == pktsz - 1 && rw == 0) ? 1'b1 : 1'b0;
+assign addr_dv = (bitcnt > header ) ? 1'b1 : 1'b0;
 
-endmodule:spi_slave
+always_ff @(posedge clk, negedge reset_n)
+begin
+	if (~reset_n || spi_start || spi_end)
+		rxdv <= 0;
+	else if (bitcnt == pktsz -1 && sync_sclk_re  && ~rw)
+		rxdv <= 1'b1;
+end
+
+assign txdv = (bitcnt == pktsz -1 && rw == 1) ? 1'b1 : 1'b0;
+
+endmodule : spi_slave
