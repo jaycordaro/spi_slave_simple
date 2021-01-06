@@ -134,7 +134,7 @@ begin
 		addr <= {addr[5:0], d_i };
 end
 
- always_ff @(posedge clk, negedge reset_n)
+always_ff @(posedge clk, negedge reset_n)
 begin
 	if (~reset_n)
 		begin
