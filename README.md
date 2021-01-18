@@ -11,9 +11,9 @@ Simple System Verilog implementation of SPI Slave
   Ther packetsize, header, and payload size are parameteters.  Defaults
   
   	parameter int pktsz = 16,  //  size of SPI packet
-		parameter int header = 8,  // size of header
-		parameter int payload = 8, // size of payload
-		parameter int addrsz = 7   // size of SPI Address Space
+	parameter int header = 8,  // size of header
+	parameter int payload = 8, // size of payload
+	parameter int addrsz = 7   // size of SPI Address Space
 
 ## Validation 
   
