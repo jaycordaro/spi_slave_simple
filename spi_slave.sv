@@ -1,30 +1,3 @@
-/*  SPI Slave Interface
-    Copyright 2020 Jay Cordaro
-
-    Redistribution and use in source and binary forms, with or without modification, 
-    are permitted provided that the following conditions are met:
-    1. Redistributions of source code must retain the above copyright notice, 
-    this list of conditions and the following disclaimer.
-    2. Redistributions in binary form must reproduce the above copyright notice, 
-    this list of conditions and the following disclaimer in the documentation 
-    and/or other materials provided with the distribution.
-    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND CONTRIBUTORS "AS IS" 
-    AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
-    IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
-    ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE 
-    LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
-    CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
-    GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) 
-    HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-    LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY 
-    OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-*/
-/* Description: Simple SPI Slave for CPOL==0/CPHA==0 
-   MSB is a Read/Write bit (1== Read, 0== Write) followed by a addrsz (default 7-bit) address field, and by a (default 8-bit) payload field.
-   if RW bit is set, the interface will return a read of the register on MISO addressed by the address field.  If RW bit is not set, it will write 
-   the contents of the payload field to the register addressed by the address field.
-*/
 module spi_slave
 		#(
 			parameter int pktsz = 16,  //  size of SPI packet
@@ -41,12 +14,12 @@ module spi_slave
 		output logic MISO,
 		// 
 		input  logic [payload-1:0] tx_d, 	// data to transmit to the master on MISO
-		input logic  tx_en,				
+		input  logic tx_en,				    // tx enable, when 
 		output logic [addrsz-1:0] addr,  	// address to slave from master on MOSI
 		output logic addr_dv,
 		output logic [payload-1:0] rx_d, 	// data rx from master on MOSI
 		output logic rxdv,           		// rx data valid
-		output logic rw_out				/* read/write out: 
+		output logic rw_out				    /* read/write out (1st bit of transaction): 
 											0 == send data from master to the slave
 											1 == request data from slave */
 		);            
@@ -93,14 +66,14 @@ logic spi_active;
 logic d_i;
 logic [7:0] d_o;
 
-assign sync_sclk_fe = (sync_sclk[2:1]==2'b10) ? 1'b1 : 1'b0;  // falling edge
-assign sync_sclk_re = (sync_sclk[2:1]==2'b01) ? 1'b1 : 1'b0;  // rising edge
+assign sync_sclk_fe = (sync_sclk[2:1]==2'b10) ? 1'b1 : 1'b0;  	// falling edge
+assign sync_sclk_re = (sync_sclk[2:1]==2'b01) ? 1'b1 : 1'b0;  	// rising edge
 
 assign spi_start = (sync_ss[2:1]==2'b10) ? 1'b1 : 1'b0;         // ss -- active low 
 assign spi_end   =   (sync_ss[2:1]==2'b01) ? 1'b1 : 1'b0;       // transaction ends 
 assign spi_active = ~sync_ss[1];
 
-assign tx_en_re = (sync_tx_en==2'b01) ? 1'b1 : 1'b0;
+assign tx_en_re = (sync_tx_en==2'b01) ? 1'b1 : 1'b0;			// tx_en rising edge
   
 assign d_i = sync_mosi[1];
 
