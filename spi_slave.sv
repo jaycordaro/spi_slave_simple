@@ -117,7 +117,7 @@ begin
 		begin 
 			d_o <= tx_d;
 		end
-	else if (spi_active && sync_sclk_re && tx_en)
+	else if (spi_active && sync_sclk_fe && tx_en)
 		begin
 			d_o <= {d_o[6:0], 1'b0};
 		end
