@@ -125,7 +125,8 @@ begin
 			d_o <= 8'b0000_0000;
 end
 
-
+assign MISO = (bitcnt > header - 1  && rw) ? d_o[7] : 1'b0;
+	
 always_ff @(posedge clk, negedge reset_n)
 begin
 	if (~reset_n)
@@ -135,8 +136,6 @@ begin
 	else if (spi_active && sync_sclk_re && bitcnt > header - 1 && ~rw)
 		rx_d <= {rx_d[6:0], d_i};
 end
-
-assign MISO = (bitcnt > header - 1  && rw) ? d_o[7] : 1'b0;
 
 always_ff @(posedge clk, negedge reset_n)
 begin
