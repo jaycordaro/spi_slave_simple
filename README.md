@@ -66,8 +66,8 @@ Interface Ports
 	<tr>
 		<td>tx_d</td>
 		<td>Input</td>
-		<td>1 </td>
-		<td>Data to transmit to host on MISO</td>
+		<td>payload </td>
+		<td>Data to transmit to host on MISO.  Parameter. Default is 8 bits</td>
 	</tr>
 	<tr>
 		<td>tx_en</td>
