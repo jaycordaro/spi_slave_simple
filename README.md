@@ -104,8 +104,9 @@ Interface Ports
 		<td>Output</td>
 		<td>1</td>
 		<td><pre>Read/Write Out.  Signals whether frame is a read transaction or write transaction.  
-	RW== 0 means send data from Host (master) to Controller (slave).
-	RW== 1 means request data from controller</pre></td>
+	<b>RW == 0</b> means this block determined 1st bit (RW) was zero; 
+	send data from Host (master) to Controller (slave).
+	<b>RW== 1</b> means request data from controller</pre></td>
 	</tr>
 </table>
 
