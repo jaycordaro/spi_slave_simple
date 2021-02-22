@@ -2,12 +2,12 @@
 Simple SystemVerilog implementation of SPI Slave
 
 ## Configuration
-  The MSB is the Read/Write bit.  
+  The MSB on MOSI is the Read/Write bit (WR).  
     Write = 0, Read = 1
   
-  This is followed by an address field, followed by a data field.  
-  MISO is only active during the data field.
-  
+  This is followed by an address field of parametrized length, followed by a data field of parameterized length which is on MOSI if RW was 0, or returned from the target on MISO
+  if RW bit was 1.  
+
   The packetsize, header, and payload size are parameteters which can be changed.  Defaults:
   
   	parameter int pktsz = 16,  //  size of SPI packet
