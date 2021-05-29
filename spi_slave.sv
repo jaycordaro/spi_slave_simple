@@ -1,6 +1,32 @@
+/* BSD 2-Clause License
+
+	Copyright (c) 2020, 2021 Jay Cordaro
+	All rights reserved.
+
+	Redistribution and use in source and binary forms, with or without
+	modification, are permitted provided that the following conditions are met:
+
+	1. Redistributions of source code must retain the above copyright notice, this
+	   list of conditions and the following disclaimer.
+
+	2. Redistributions in binary form must reproduce the above copyright notice,
+	   this list of conditions and the following disclaimer in the documentation
+	   and/or other materials provided with the distribution.
+
+	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+	AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+	IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+	DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+	FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+	DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+	SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+	CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+	OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+	OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+*/
 module spi_slave
 		#(
-			parameter int pktsz = 16,  //  size of SPI packet
+			parameter int pktsz = 16,  // size of SPI packet
 			parameter int header = 8,  // size of header
 			parameter int payload = 8, // size of payload
 			parameter int addrsz = 7   // size of SPI Address Space
@@ -12,7 +38,7 @@ module spi_slave
 		input logic SSB,
 		input logic MOSI,
 		output logic MISO,
-		// 
+		// internal connections 
 		input  logic [payload-1:0] tx_d, 	// data to transmit to the master on MISO
 		input  logic tx_en,				    // tx enable, when 
 		output logic [addrsz-1:0] addr,  	// address to slave from master on MOSI
@@ -28,7 +54,7 @@ logic [2:0] sync_sclk;
 logic [2:0] sync_ss;
 logic [1:0] sync_mosi;
 logic [1:0] sync_tx_en;
-logic [3:0] bitcnt;
+logic [$clog2(pktsz):0] bitcnt;
 logic rw;
 
 logic mosi;
@@ -64,7 +90,7 @@ logic spi_start;
 logic spi_end; 
 logic spi_active;
 logic d_i;
-logic [7:0] d_o;
+logic [payload-1:0] d_o;
 
 assign sync_sclk_fe = (sync_sclk[2:1]==2'b10) ? 1'b1 : 1'b0;  	// falling edge
 assign sync_sclk_re = (sync_sclk[2:1]==2'b01) ? 1'b1 : 1'b0;  	// rising edge
@@ -80,9 +106,9 @@ assign d_i = sync_mosi[1];
 always_ff @(posedge clk, negedge reset_n)
 begin
 	if (~reset_n)
-		bitcnt <= 4'b0000;
+		bitcnt <= 0;
 	else if (spi_start)
-		bitcnt <= 4'b0000;
+		bitcnt <= 0;
 	else if (spi_active && sync_sclk_re)
 		bitcnt <= bitcnt + 1;
 end
@@ -100,18 +126,18 @@ end
 always_ff @(posedge clk, negedge reset_n)
 begin
 	if (~reset_n )
-		addr <= 7'b000_0000;
+		addr <= 0;
 	else if (spi_start)
-		addr <= 7'b000_0000;
+		addr <= 0;
 	else if (spi_active && sync_sclk_re && bitcnt > 0 && bitcnt <= 7)
-		addr <= {addr[5:0], d_i };
+		addr <= {addr[addrsz-2:0], d_i };
 end
 
 always_ff @(posedge clk, negedge reset_n)
 begin
 	if (~reset_n)
 		begin
-			d_o <= 8'b0000_0000;
+			d_o <= 0;
 		end
 	else if (tx_en_re)
 		begin 
@@ -119,22 +145,22 @@ begin
 		end
 	else if (spi_active && sync_sclk_fe && tx_en)
 		begin
-			d_o <= {d_o[6:0], 1'b0};
+			d_o <= {d_o[payload-2:0], 1'b0};
 		end
 	else if (~tx_en)
-			d_o <= 8'b0000_0000;
+			d_o <= 0;
 end
 
-assign MISO = (bitcnt > header - 1  && rw) ? d_o[7] : 1'b0;
+assign MISO = (bitcnt > header - 1  && rw) ? d_o[payload-1] : 1'b0;
 	
 always_ff @(posedge clk, negedge reset_n)
 begin
 	if (~reset_n)
-		rx_d <= 8'b0000_0000;
+		rx_d <= 0;
 	else if (spi_start)
-		rx_d <= 8'b0000_0000;
+		rx_d <= 0;
 	else if (spi_active && sync_sclk_re && bitcnt > header - 1 && ~rw)
-		rx_d <= {rx_d[6:0], d_i};
+		rx_d <= {rx_d[payload-2:0], d_i};
 end
 
 always_ff @(posedge clk, negedge reset_n)
