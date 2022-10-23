@@ -26,11 +26,11 @@
 */
 module spi_slave
 		#(
-			parameter int pktsz = 16,  // size of SPI packet
-			parameter int header = 8,  // size of header
-			parameter int payload = 8, // size of payload
-			parameter int addrsz = 7   // size of SPI Address Space
-		)
+		  parameter int pktsz = 16,  // size of SPI packet
+		  parameter int header = 8,  // size of header
+		  parameter int payload = 8, // size of payload
+		  parameter int addrsz = 7   // size of SPI Address Space
+		 )
 	   (input logic clk,     // system clock
 		input logic reset_n, // system reset
 		// SPI I/O
@@ -72,14 +72,14 @@ always_ff @ (posedge clk or negedge reset_n)
                 sync_sclk <= 3'b000;
                 sync_ss   <= 3'b111;
                 sync_mosi <= 2'b00;
-				sync_tx_en<= 2'b00;
+		sync_tx_en<= 2'b00;
             end
         else
             begin
                 sync_sclk <= {sync_sclk[1:0], sclk};
                 sync_ss   <= {sync_ss[1:0], ssb};
                 sync_mosi <= {sync_mosi[0], mosi};
-				sync_tx_en<= {sync_tx_en[0], tx_en};
+		sync_tx_en<= {sync_tx_en[0], tx_en};
             end
     end
 
