@@ -1,36 +1,10 @@
-/* BSD 2-Clause License
-
-	Copyright (c) 2020, 2021 Jay Cordaro
-	All rights reserved.
-
-	Redistribution and use in source and binary forms, with or without
-	modification, are permitted provided that the following conditions are met:
-
-	1. Redistributions of source code must retain the above copyright notice, this
-	   list of conditions and the following disclaimer.
-
-	2. Redistributions in binary form must reproduce the above copyright notice,
-	   this list of conditions and the following disclaimer in the documentation
-	   and/or other materials provided with the distribution.
-
-	THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-	AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-	IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-	DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-	FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-	DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-	SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-	CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-	OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-	OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
-*/
 module spi_slave
 		#(
-		  parameter int pktsz = 16,  // size of SPI packet
-		  parameter int header = 8,  // size of header
-		  parameter int payload = 8, // size of payload
-		  parameter int addrsz = 7   // size of SPI Address Space
-		 )
+			parameter int pktsz = 16,  //  size of SPI packet
+			parameter int header = 8,  // size of header
+			parameter int payload = 8, // size of payload
+			parameter int addrsz = 7   // size of SPI Address Space
+		)
 	   (input logic clk,     // system clock
 		input logic reset_n, // system reset
 		// SPI I/O
@@ -38,23 +12,28 @@ module spi_slave
 		input logic SSB,
 		input logic MOSI,
 		output logic MISO,
-		// internal connections 
-		input  logic [payload-1:0] tx_d, 	// data to transmit to the master on MISO
-		input  logic tx_en,				    // tx enable, when 
-		output logic [addrsz-1:0] addr,  	// address to slave from master on MOSI
+		// input  logic [payload-1:0] tx_d, 	// data to transmit to the master on MISO
+		input  logic [payload-1:0] tx_d, 		// data to transmit to the master on MISO
+		input  logic tx_en,				    	// tx enable, when 
+		//output logic [addrsz-1:0] reg_addr,  	// address to slave from master on MOSI
+		output logic [addrsz-1:0] reg_addr,  	// address to slave from master on MOSI
 		output logic addr_dv,
+		//output logic [payload-1:0] rx_d, 	// data rx from master on MOSI
 		output logic [payload-1:0] rx_d, 	// data rx from master on MOSI
 		output logic rxdv,           		// rx data valid
-		output logic rw_out				    /* read/write out (1st bit of transaction): 
-											0 == send data from master to the slave
-											1 == request data from slave */
+		output logic rw_out			/* read/write out (1st bit of transaction): 
+									0 == send data from master to the slave
+									1 == request data from slave */
 		);            
 
+// synchronization
 logic [2:0] sync_sclk;
 logic [2:0] sync_ss;
 logic [1:0] sync_mosi;
 logic [1:0] sync_tx_en;
+// count of bits in SPI transaction
 logic [$clog2(pktsz):0] bitcnt;
+// readwrite bit
 logic rw;
 
 logic mosi;
@@ -72,14 +51,14 @@ always_ff @ (posedge clk or negedge reset_n)
                 sync_sclk <= 3'b000;
                 sync_ss   <= 3'b111;
                 sync_mosi <= 2'b00;
-		sync_tx_en<= 2'b00;
+				sync_tx_en<= 2'b00;
             end
         else
             begin
                 sync_sclk <= {sync_sclk[1:0], sclk};
                 sync_ss   <= {sync_ss[1:0], ssb};
                 sync_mosi <= {sync_mosi[0], mosi};
-		sync_tx_en<= {sync_tx_en[0], tx_en};
+				sync_tx_en<= {sync_tx_en[0], tx_en};
             end
     end
 
@@ -92,8 +71,8 @@ logic spi_active;
 logic d_i;
 logic [payload-1:0] d_o;
 
-assign sync_sclk_fe = (sync_sclk[2:1]==2'b10) ? 1'b1 : 1'b0;  	// falling edge
-assign sync_sclk_re = (sync_sclk[2:1]==2'b01) ? 1'b1 : 1'b0;  	// rising edge
+assign sync_sclk_fe = (sync_sclk[2:1]==2'b10) ? 1'b1 : 1'b0;  	// falling edge of sclk
+assign sync_sclk_re = (sync_sclk[2:1]==2'b01) ? 1'b1 : 1'b0;  	// rising edge of sclk
 
 assign spi_start = (sync_ss[2:1]==2'b10) ? 1'b1 : 1'b0;         // ss -- active low 
 assign spi_end   =   (sync_ss[2:1]==2'b01) ? 1'b1 : 1'b0;       // transaction ends 
@@ -113,6 +92,7 @@ begin
 		bitcnt <= bitcnt + 1;
 end
 
+// Capture 1st bit from host.  If rw==0, a write from host to target.  1== read of FPGA to host
 always_ff @(posedge clk, negedge reset_n)
 begin
 	if (~reset_n)
@@ -123,14 +103,15 @@ begin
 		rw <= d_i;
 end
 
+// capture next 7 bits for register address
 always_ff @(posedge clk, negedge reset_n)
 begin
 	if (~reset_n )
-		addr <= 0;
+		reg_addr <= 0;
 	else if (spi_start)
-		addr <= 0;
-	else if (spi_active && sync_sclk_re && bitcnt > 0 && bitcnt <= 7)
-		addr <= {addr[addrsz-2:0], d_i };
+		reg_addr <= 0;
+	else if (spi_active && sync_sclk_re && bitcnt > 0 && bitcnt <= addrsz)
+		reg_addr <= {reg_addr[addrsz-2:0], d_i };
 end
 
 always_ff @(posedge clk, negedge reset_n)
@@ -143,7 +124,7 @@ begin
 		begin 
 			d_o <= tx_d;
 		end
-	else if (spi_active && sync_sclk_fe && tx_en)
+	else if (spi_active && sync_sclk_re && tx_en)
 		begin
 			d_o <= {d_o[payload-2:0], 1'b0};
 		end
@@ -151,8 +132,7 @@ begin
 			d_o <= 0;
 end
 
-assign MISO = (bitcnt > header - 1  && rw) ? d_o[payload-1] : 1'b0;
-	
+
 always_ff @(posedge clk, negedge reset_n)
 begin
 	if (~reset_n)
@@ -163,13 +143,17 @@ begin
 		rx_d <= {rx_d[payload-2:0], d_i};
 end
 
+assign MISO = (bitcnt > header - 1  && rw) ? d_o[7] : 1'b0;
+//assign MISO  = 1'b0;
+
+// address data valid
 always_ff @(posedge clk, negedge reset_n)
 begin
 	if (~reset_n )
 		addr_dv <= 1'b0;
 	else if (spi_start || spi_end)
 		addr_dv <= 1'b0;
-	else if (bitcnt > header - 1)
+	else if (bitcnt > header - 2)
 		addr_dv <= 1'b1;
 end
 
